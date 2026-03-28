@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline — Smart Glasses Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+<div id="sidebar-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99"></div>
+
+<div class="app-shell">
+  <aside class="sidebar" id="main-sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🕶️</div>
+      <div class="logo-text"><span>SMART GLASSES</span>DASHBOARD</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Capture</div>
+      <a href="/" class="nav-link"><span class="nav-icon">📷</span> Camera</a>
+      <div class="nav-section-label">Library</div>
+      <a href="/gallery.html" class="nav-link"><span class="nav-icon">🗂️</span> Gallery</a>
+      <a href="/timeline.html" class="nav-link active"><span class="nav-icon">📅</span> Timeline</a>
+      <div class="nav-section-label">Insights</div>
+      <a href="/dashboard.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section-label">Settings</div>
+      <div class="nav-link" id="dark-toggle" style="cursor:pointer">
+        <span class="nav-icon">🌙</span> Dark Mode
+        <div class="theme-toggle" style="margin-left:auto"><div class="theme-toggle-knob"></div></div>
+      </div>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar">??</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-username">Loading...</div>
+        <div class="user-role">OPERATOR</div>
+      </div>
+      <button class="btn-logout" id="btn-logout" title="Sign Out">⏻</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+      <span class="topbar-title">TIMELINE</span>
+      <div class="topbar-spacer"></div>
+    </header>
+
+    <div class="page-content" id="timeline-content">
+      <div class="empty-state">
+        <div class="empty-state-icon">📅</div>
+        <div class="empty-state-title">LOADING TIMELINE</div>
+        <div class="spinner" style="margin:1rem auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Viewer Modal (same as gallery) -->
+<div class="modal-backdrop" id="modal-viewer">
+  <div class="modal modal-media" style="background:var(--bg-deep);">
+    <div class="modal-header">
+      <span class="modal-title">MEDIA VIEWER</span>
+      <button class="btn btn-ghost btn-icon" onclick="Modal.close('modal-viewer')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#000; border-radius:var(--radius); overflow:hidden; margin-bottom:1rem; max-height:60vh; display:flex; align-items:center; justify-content:center;">
+        <img id="viewer-img" style="max-width:100%; max-height:60vh; display:none;">
+        <video id="viewer-vid" style="max-width:100%; max-height:60vh; display:none;" controls></video>
+      </div>
+      <div id="viewer-meta" style="font-size:0.8rem; color:var(--text-secondary); font-family:var(--font-mono);"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('modal-viewer')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) window.stop();
+Sidebar.init();
+Theme.init();
+document.getElementById('dark-toggle').addEventListener('click', Theme.toggle.bind(Theme));
+
+const TIME_ICONS = {
+  'Night':     { icon: '🌙', color: 'var(--cyan-dim)' },
+  'Morning':   { icon: '🌅', color: 'var(--amber)' },
+  'Afternoon': { icon: '☀️',  color: 'var(--green)' },
+  'Evening':   { icon: '🌆', color: 'var(--red)' }
+};
+const TIME_ORDER = ['Morning', 'Afternoon', 'Evening', 'Night'];
+
+async function loadTimeline() {
+  try {
+    const media = await API.getMedia();
+    renderTimeline(media);
+  } catch (err) {
+    Toast.error('Failed to load timeline');
+  }
+}
+
+function renderTimeline(media) {
+  const container = document.getElementById('timeline-content');
+
+  if (!media.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📅</div>
+        <div class="empty-state-title">NO MEDIA YET</div>
+        <p>Capture photos and videos to build your timeline.</p>
+        <a href="/" class="btn btn-primary" style="display:inline-flex; margin-top:1rem">📷 Go to Camera</a>
+      </div>`;
+    return;
+  }
+
+  const grouped = Helpers.groupByDate(media);
+  container.innerHTML = '';
+
+  Object.entries(grouped).forEach(([dateLabel, byTod], di) => {
+    // Date header
+    const dateSection = document.createElement('div');
+    dateSection.style.marginBottom = '2.5rem';
+
+    const dateHeader = document.createElement('div');
+    dateHeader.style.cssText = `
+      display:flex; align-items:center; gap:0.75rem;
+      margin-bottom:1.5rem;
+      padding-bottom:0.75rem;
+      border-bottom:1px solid var(--border);
+    `;
+    dateHeader.innerHTML = `
+      <div style="font-family:var(--font-display); font-size:0.85rem; letter-spacing:0.1em; color:var(--text-primary);">
+        ${dateLabel.toUpperCase()}
+      </div>
+      <div style="flex:1; height:1px; background:var(--border);"></div>
+      <div style="font-family:var(--font-mono); font-size:0.65rem; color:var(--cyan); background:var(--cyan-glow); border:1px solid rgba(0,212,255,0.2); padding:2px 8px; border-radius:3px;">
+        ${Object.values(byTod).reduce((s, arr) => s + arr.length, 0)} ITEMS
+      </div>
+    `;
+    dateSection.appendChild(dateHeader);
+
+    // Time-of-day groups
+    TIME_ORDER.forEach(tod => {
+      if (!byTod[tod] || !byTod[tod].length) return;
+      const items = byTod[tod];
+      const meta = TIME_ICONS[tod] || { icon: '⏰', color: 'var(--cyan)' };
+
+      const todSection = document.createElement('div');
+      todSection.style.marginBottom = '1.5rem';
+      todSection.className = 'fade-in';
+      todSection.style.animationDelay = `${di * 0.1}s`;
+      todSection.style.opacity = '0';
+
+      todSection.innerHTML = `
+        <div class="timeline-header" style="margin-bottom:0.75rem;">
+          <span style="color:${meta.color}; font-size:1rem;">${meta.icon}</span>
+          <span class="timeline-label" style="color:${meta.color};">${tod.toUpperCase()}</span>
+          <div class="timeline-line"></div>
+          <span class="timeline-count">${items.length}</span>
+        </div>
+      `;
+
+      // Media strip
+      const strip = document.createElement('div');
+      strip.style.cssText = 'display:flex; gap:0.75rem; overflow-x:auto; padding-bottom:0.5rem;';
+      strip.style.scrollbarWidth = 'thin';
+
+      items.forEach(item => {
+        const thumb = document.createElement('div');
+        thumb.style.cssText = `
+          flex-shrink:0; width:160px; border-radius:var(--radius-lg);
+          overflow:hidden; cursor:pointer; border:1px solid var(--border);
+          transition:all var(--transition); background:var(--bg-raised);
+        `;
+        thumb.addEventListener('mouseenter', () => {
+          thumb.style.borderColor = 'var(--cyan-dim)';
+          thumb.style.transform = 'scale(1.03)';
+          thumb.style.boxShadow = '0 4px 20px var(--cyan-glow)';
+        });
+        thumb.addEventListener('mouseleave', () => {
+          thumb.style.borderColor = 'var(--border)';
+          thumb.style.transform = 'scale(1)';
+          thumb.style.boxShadow = 'none';
+        });
+        thumb.addEventListener('click', () => openViewer(item));
+
+        const thumbMedia = item.type === 'video'
+          ? `<video src="${item.url}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+          : `<img src="${item.url}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">`;
+
+        thumb.innerHTML = `
+          <div style="aspect-ratio:4/3; overflow:hidden; position:relative; background:#000;">
+            ${thumbMedia}
+            <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.7);color:var(--cyan);font-size:0.55rem;font-family:var(--font-mono);padding:1px 5px;border-radius:2px;border:1px solid var(--border);">
+              ${item.type === 'video' ? '▶ VID' : '◉ PHO'}
+            </div>
+          </div>
+          <div style="padding:0.5rem;">
+            <div style="font-size:0.65rem; color:var(--text-muted); font-family:var(--font-mono);">${Helpers.formatTime(item.createdAt)}</div>
+            ${item.location ? `<div style="font-size:0.65rem; color:var(--text-secondary);">📍 ${item.location}</div>` : ''}
+            ${(item.tags||[]).slice(0,2).map(t=>`<span class="tag" style="font-size:0.55rem;">${t}</span>`).join('')}
+          </div>
+        `;
+        strip.appendChild(thumb);
+      });
+
+      todSection.appendChild(strip);
+      dateSection.appendChild(todSection);
+    });
+
+    container.appendChild(dateSection);
+  });
+}
+
+function openViewer(item) {
+  const img = document.getElementById('viewer-img');
+  const vid = document.getElementById('viewer-vid');
+  const meta = document.getElementById('viewer-meta');
+
+  meta.innerHTML = `
+    <span>🕐 ${Helpers.formatDateTime(item.createdAt)}</span>
+    ${item.location ? `&nbsp;&nbsp;📍 ${item.location}` : ''}
+    ${(item.tags||[]).length ? `&nbsp;&nbsp;🏷️ ${item.tags.join(', ')}` : ''}
+  `;
+
+  if (item.type === 'photo') {
+    img.src = item.url; img.style.display = 'block';
+    vid.style.display = 'none'; vid.src = '';
+  } else {
+    vid.src = item.url; vid.style.display = 'block';
+    img.style.display = 'none';
+  }
+  Modal.open('modal-viewer');
+}
+
+loadTimeline();
+</script>
+</body>
+</html>

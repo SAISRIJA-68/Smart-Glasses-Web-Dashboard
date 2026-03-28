@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera — Smart Glasses Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+<div id="sidebar-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99"></div>
+
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="main-sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🕶️</div>
+      <div class="logo-text"><span>SMART GLASSES</span>DASHBOARD</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Capture</div>
+      <a href="/" class="nav-link active"><span class="nav-icon">📷</span> Camera</a>
+      <div class="nav-section-label">Library</div>
+      <a href="/gallery.html" class="nav-link"><span class="nav-icon">🗂️</span> Gallery</a>
+      <a href="/timeline.html" class="nav-link"><span class="nav-icon">📅</span> Timeline</a>
+      <div class="nav-section-label">Insights</div>
+      <a href="/dashboard.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section-label">Settings</div>
+      <div class="nav-link" id="dark-toggle" style="cursor:pointer">
+        <span class="nav-icon">🌙</span> Dark Mode
+        <div class="theme-toggle" style="margin-left:auto"><div class="theme-toggle-knob"></div></div>
+      </div>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar">??</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-username">Loading...</div>
+        <div class="user-role">OPERATOR</div>
+      </div>
+      <button class="btn-logout" id="btn-logout" title="Sign Out">⏻</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <header class="topbar">
+      <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+      <span class="topbar-title">LIVE CAMERA</span>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btn-pov" title="POV Fullscreen Mode">⊡ POV</button>
+        <button class="btn btn-ghost" id="btn-autocapture" title="Auto Capture">⏱ AUTO</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div style="display:grid; grid-template-columns: 1fr 340px; gap:1.25rem;" class="camera-layout">
+
+        <!-- Camera View -->
+        <div>
+          <div class="camera-container" id="camera-container">
+            <!-- Video feed -->
+            <video id="camera-video" autoplay muted playsinline></video>
+
+            <!-- HUD Overlay -->
+            <div class="hud-overlay" id="hud-overlay">
+              <div class="hud-top">
+                <div>
+                  <div class="hud-time" id="hud-time">00:00:00</div>
+                  <div id="hud-date" style="font-size:0.6rem;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;"></div>
+                </div>
+                <div class="hud-top-right">
+                  <div class="hud-battery">
+                    <div class="battery-bar">
+                      <div class="battery-fill" style="width:85%"></div>
+                    </div>
+                    <span class="battery-pct" style="font-size:0.6rem;">85%</span>
+                  </div>
+                  <div class="hud-wifi">▲ WIFI 5GHz</div>
+                  <div class="hud-rec" id="hud-rec"><div class="rec-dot"></div> REC</div>
+                </div>
+              </div>
+
+              <!-- Crosshair -->
+              <div class="hud-crosshair"></div>
+
+              <!-- Bottom status -->
+              <div class="hud-bottom">
+                <div class="hud-status" id="hud-status">● LIVE FEED</div>
+                <div class="hud-status" id="rec-timer" style="display:none; color:var(--red);">⏱ 00:00</div>
+
+                <!-- Camera Controls (inside HUD bottom, pointer-events:all) -->
+                <div class="camera-controls">
+                  <button class="ctrl-btn ctrl-secondary" id="btn-switch-cam" title="Switch Camera">🔄</button>
+                  <button class="ctrl-btn ctrl-record" id="btn-record" title="Record Video">⏺</button>
+                  <button class="ctrl-btn ctrl-shutter" id="btn-capture" title="Capture Photo"></button>
+                  <button class="ctrl-btn ctrl-secondary" id="btn-gallery-quick" title="Go to Gallery" onclick="window.location.href='/gallery.html'">🗂️</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Auto-capture indicator (hidden by default) -->
+            <div class="autocapture-indicator" id="autocapture-indicator" style="display:none">⏱ AUTO CAPTURE</div>
+          </div>
+
+          <!-- Camera permission message -->
+          <div id="camera-error" style="display:none; margin-top:1rem; padding:1.5rem; background:var(--bg-surface); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-lg); text-align:center; color:var(--text-secondary);">
+            <div style="font-size:2rem; margin-bottom:0.75rem;">📷</div>
+            <div style="font-family:var(--font-display); font-size:0.75rem; letter-spacing:0.1em; color:var(--text-primary); margin-bottom:0.5rem;">CAMERA ACCESS REQUIRED</div>
+            <p style="font-size:0.8rem; margin-bottom:1rem;">Allow camera access to use the live feed.</p>
+            <button class="btn btn-primary" id="btn-retry-cam">Retry Camera</button>
+          </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div style="display:flex; flex-direction:column; gap:1rem;">
+          <!-- Capture settings -->
+          <div class="card fade-in fade-in-d1">
+            <div class="card-title">CAPTURE SETTINGS</div>
+
+            <div class="form-group">
+              <label class="form-label">Location Tag</label>
+              <input type="text" id="cap-location" placeholder="e.g. Home, Office, Park...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tags <span style="color:var(--text-dim)">(Enter to add)</span></label>
+              <div class="tags-input-container" id="cap-tags-container"></div>
+            </div>
+          </div>
+
+          <!-- Quick stats -->
+          <div class="card fade-in fade-in-d2">
+            <div class="card-title">SESSION</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div style="text-align:center; padding:0.5rem; background:var(--bg-raised); border-radius:var(--radius);">
+                <div style="font-family:var(--font-display); font-size:1.5rem; color:var(--cyan);" id="session-photos">0</div>
+                <div style="font-size:0.65rem; color:var(--text-muted);">PHOTOS</div>
+              </div>
+              <div style="text-align:center; padding:0.5rem; background:var(--bg-raised); border-radius:var(--radius);">
+                <div style="font-family:var(--font-display); font-size:1.5rem; color:var(--red);" id="session-videos">0</div>
+                <div style="font-size:0.65rem; color:var(--text-muted);">VIDEOS</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Auto capture settings -->
+          <div class="card fade-in fade-in-d3" id="autocapture-panel" style="display:none;">
+            <div class="card-title">AUTO CAPTURE</div>
+            <div class="form-group">
+              <label class="form-label">Interval (seconds)</label>
+              <input type="number" id="autocapture-interval" value="5" min="1" max="60" style="width:100%">
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <button class="btn btn-success" id="btn-start-autocapture" style="flex:1">▶ Start</button>
+              <button class="btn btn-danger" id="btn-stop-autocapture" style="flex:1; display:none">■ Stop</button>
+            </div>
+          </div>
+
+          <!-- Recent captures -->
+          <div class="card fade-in fade-in-d4" style="flex:1; overflow:hidden;">
+            <div class="card-title">RECENT</div>
+            <div id="recent-captures" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; max-height:300px; overflow-y:auto;">
+              <div class="empty-state" style="grid-column:1/-1; padding:2rem 1rem;">
+                <div class="empty-state-icon" style="font-size:1.5rem;">📷</div>
+                <p style="font-size:0.75rem;">No captures yet</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Media Modal -->
+<div class="modal-backdrop" id="modal-save">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="save-modal-title">SAVE PHOTO</span>
+      <button class="btn btn-ghost btn-icon" onclick="Modal.close('modal-save')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:1rem; border-radius:var(--radius); overflow:hidden; background:var(--bg-raised); aspect-ratio:16/9;">
+        <img id="save-preview-img" style="width:100%;height:100%;object-fit:contain; display:none">
+        <video id="save-preview-vid" style="width:100%;height:100%;object-fit:contain; display:none" controls></video>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location Tag</label>
+        <input type="text" id="save-location" placeholder="Optional location">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <div class="tags-input-container" id="save-tags-container"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('modal-save')">Discard</button>
+      <button class="btn btn-primary" id="btn-confirm-save">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auto capture modal -->
+<div class="modal-backdrop" id="modal-autocapture-setup">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">AUTO CAPTURE MODE</span>
+      <button class="btn btn-ghost btn-icon" onclick="Modal.close('modal-autocapture-setup')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Automatically capture a photo at set intervals.</p>
+      <div class="form-group">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" id="ac-interval" value="5" min="1" max="300">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('modal-autocapture-setup')">Cancel</button>
+      <button class="btn btn-primary" id="btn-ac-confirm">⏱ Start Auto Capture</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) window.stop();
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+Sidebar.init();
+HUD.init();
+
+let stream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let recordInterval = null;
+let recordSeconds = 0;
+let pendingMedia = null;
+let sessionPhotos = 0;
+let sessionVideos = 0;
+let autoCaptureTimer = null;
+let tagsInput = null;
+let saveTagsInput = null;
+
+// ─── Tags inputs ─────────────────────────────────────────────────────────────
+tagsInput = new TagsInput(document.getElementById('cap-tags-container'));
+saveTagsInput = new TagsInput(document.getElementById('save-tags-container'));
+
+// ─── Camera ───────────────────────────────────────────────────────────────────
+const video = document.getElementById('camera-video');
+let currentFacingMode = 'environment';
+
+async function startCamera(facingMode = 'user') {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: true
+    });
+    video.srcObject = stream;
+    document.getElementById('camera-error').style.display = 'none';
+    document.getElementById('hud-status').textContent = '● LIVE FEED';
+  } catch (err) {
+    console.error('Camera error:', err);
+    document.getElementById('camera-error').style.display = 'block';
+    document.getElementById('hud-status').textContent = '✕ NO SIGNAL';
+  }
+}
+
+startCamera('user');
+
+document.getElementById('btn-retry-cam').addEventListener('click', () => startCamera(currentFacingMode));
+document.getElementById('btn-switch-cam').addEventListener('click', () => {
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  startCamera(currentFacingMode);
+  Toast.info('Camera switched');
+});
+
+// ─── Photo Capture ────────────────────────────────────────────────────────────
+document.getElementById('btn-capture').addEventListener('click', capturePhoto);
+
+function capturePhoto() {
+  if (!stream) { Toast.error('Camera not available'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+  // Flash effect
+  const flash = document.createElement('div');
+  flash.className = 'capture-flash';
+  document.getElementById('camera-container').appendChild(flash);
+  setTimeout(() => flash.remove(), 400);
+
+  pendingMedia = { dataUrl, type: 'photo' };
+  openSaveModal('photo', dataUrl);
+}
+
+// ─── Video Recording ──────────────────────────────────────────────────────────
+const recBtn = document.getElementById('btn-record');
+recBtn.addEventListener('click', toggleRecording);
+
+function toggleRecording() {
+  if (!isRecording) startRecording();
+  else stopRecording();
+}
+
+function startRecording() {
+  if (!stream) { Toast.error('Camera not available'); return; }
+  recordedChunks = [];
+  try {
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+  } catch {
+    mediaRecorder = new MediaRecorder(stream);
+  }
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = handleRecordingStop;
+  mediaRecorder.start(100);
+  isRecording = true;
+  recBtn.classList.add('recording');
+  recBtn.innerHTML = '⏹';
+  document.getElementById('hud-rec').classList.add('active');
+  document.getElementById('rec-timer').style.display = 'block';
+  recordSeconds = 0;
+  recordInterval = setInterval(() => {
+    recordSeconds++;
+    const m = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+    const s = String(recordSeconds % 60).padStart(2, '0');
+    document.getElementById('rec-timer').textContent = `⏱ ${m}:${s}`;
+  }, 1000);
+  Toast.info('Recording started');
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    clearInterval(recordInterval);
+    recBtn.classList.remove('recording');
+    recBtn.innerHTML = '⏺';
+    document.getElementById('hud-rec').classList.remove('active');
+    document.getElementById('rec-timer').style.display = 'none';
+  }
+}
+
+function handleRecordingStop() {
+  const blob = new Blob(recordedChunks, { type: 'video/webm' });
+  const dataUrl = URL.createObjectURL(blob);
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingMedia = { dataUrl: reader.result, type: 'video', blob };
+    openSaveModal('video', dataUrl);
+  };
+  reader.readAsDataURL(blob);
+  sessionVideos++;
+  document.getElementById('session-videos').textContent = sessionVideos;
+  Toast.success('Recording stopped');
+}
+
+// ─── Save Modal ───────────────────────────────────────────────────────────────
+function openSaveModal(type, previewUrl) {
+  const imgEl = document.getElementById('save-preview-img');
+  const vidEl = document.getElementById('save-preview-vid');
+  document.getElementById('save-modal-title').textContent = type === 'video' ? 'SAVE VIDEO' : 'SAVE PHOTO';
+  document.getElementById('save-location').value = document.getElementById('cap-location').value;
+  saveTagsInput.setTags(tagsInput.getTags());
+
+  if (type === 'photo') {
+    imgEl.src = previewUrl; imgEl.style.display = 'block';
+    vidEl.style.display = 'none';
+  } else {
+    vidEl.src = previewUrl; vidEl.style.display = 'block';
+    imgEl.style.display = 'none';
+  }
+  Modal.open('modal-save');
+}
+
+document.getElementById('btn-confirm-save').addEventListener('click', async () => {
+  if (!pendingMedia) return;
+  const btn = document.getElementById('btn-confirm-save');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const item = await API.uploadMedia({
+      dataUrl: pendingMedia.dataUrl,
+      type: pendingMedia.type,
+      tags: saveTagsInput.getTags(),
+      location: document.getElementById('save-location').value.trim()
+    });
+
+    Modal.close('modal-save');
+    Toast.success(pendingMedia.type === 'photo' ? '📷 Photo saved!' : '🎬 Video saved!');
+
+    if (pendingMedia.type === 'photo') {
+      sessionPhotos++;
+      document.getElementById('session-photos').textContent = sessionPhotos;
+    }
+    addToRecentCaptures(item);
+    pendingMedia = null;
+  } catch (err) {
+    Toast.error('Save failed: ' + err.message);
+  }
+  btn.disabled = false; btn.innerHTML = '💾 Save';
+});
+
+// ─── Recent captures ──────────────────────────────────────────────────────────
+function addToRecentCaptures(item) {
+  const container = document.getElementById('recent-captures');
+  container.querySelector('.empty-state')?.remove();
+
+  const thumb = document.createElement('div');
+  thumb.style.cssText = 'border-radius:6px;overflow:hidden;aspect-ratio:4/3;background:var(--bg-raised);cursor:pointer;position:relative;';
+  if (item.type === 'photo') {
+    thumb.innerHTML = `<img src="${item.url}" style="width:100%;height:100%;object-fit:cover">`;
+  } else {
+    thumb.innerHTML = `<video src="${item.url}" style="width:100%;height:100%;object-fit:cover" muted></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem">▶</div>`;
+  }
+  container.insertBefore(thumb, container.firstChild);
+
+  // Keep only 6
+  while (container.children.length > 6) container.lastChild.remove();
+}
+
+// ─── POV Mode ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-pov').addEventListener('click', () => {
+  const container = document.getElementById('camera-container');
+  if (container.classList.contains('pov-mode')) {
+    container.classList.remove('pov-mode');
+    document.getElementById('btn-pov').textContent = '⊡ POV';
+    Toast.info('Exited POV mode');
+  } else {
+    container.classList.add('pov-mode');
+    container.style.cssText = 'position:fixed;inset:0;z-index:500;border-radius:0;';
+    document.getElementById('btn-pov').textContent = '⊠ EXIT POV';
+    Toast.info('POV Mode — press ESC to exit');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const c = document.getElementById('camera-container');
+    if (c.style.position === 'fixed') {
+      c.style.cssText = '';
+      c.classList.remove('pov-mode');
+      document.getElementById('btn-pov').textContent = '⊡ POV';
+    }
+    Modal.closeAll();
+    stopAutoCapture();
+  }
+  if (e.key === ' ' && !e.target.matches('input, textarea')) {
+    e.preventDefault(); capturePhoto();
+  }
+});
+
+// ─── Auto Capture ─────────────────────────────────────────────────────────────
+document.getElementById('btn-autocapture').addEventListener('click', () => {
+  const panel = document.getElementById('autocapture-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
+
+document.getElementById('btn-start-autocapture').addEventListener('click', startAutoCapture);
+document.getElementById('btn-stop-autocapture').addEventListener('click', stopAutoCapture);
+
+function startAutoCapture() {
+  const interval = parseInt(document.getElementById('autocapture-interval').value) * 1000;
+  document.getElementById('autocapture-indicator').style.display = 'block';
+  document.getElementById('btn-start-autocapture').style.display = 'none';
+  document.getElementById('btn-stop-autocapture').style.display = 'block';
+  autoCaptureTimer = setInterval(() => {
+    if (!stream) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+    // Auto-save without modal
+    API.uploadMedia({
+      dataUrl, type: 'photo',
+      tags: [...tagsInput.getTags(), 'auto'],
+      location: document.getElementById('cap-location').value.trim()
+    }).then(item => {
+      sessionPhotos++;
+      document.getElementById('session-photos').textContent = sessionPhotos;
+      addToRecentCaptures(item);
+      Toast.info('⏱ Auto-captured photo');
+    }).catch(err => Toast.error('Auto-capture failed'));
+  }, interval);
+  Toast.success('Auto capture started');
+}
+
+function stopAutoCapture() {
+  if (autoCaptureTimer) {
+    clearInterval(autoCaptureTimer);
+    autoCaptureTimer = null;
+    document.getElementById('autocapture-indicator').style.display = 'none';
+    document.getElementById('btn-start-autocapture').style.display = 'block';
+    document.getElementById('btn-stop-autocapture').style.display = 'none';
+    Toast.info('Auto capture stopped');
+  }
+}
+
+// Theme toggle in sidebar nav
+document.getElementById('dark-toggle').addEventListener('click', Theme.toggle.bind(Theme));
+
+// Responsive: adjust layout
+window.addEventListener('resize', () => {
+  const layout = document.querySelector('.camera-layout');
+  if (layout) {
+    layout.style.gridTemplateColumns = window.innerWidth < 900 ? '1fr' : '1fr 340px';
+  }
+});
+if (window.innerWidth < 900) {
+  const layout = document.querySelector('.camera-layout');
+  if (layout) layout.style.gridTemplateColumns = '1fr';
+}
+</script>
+</body>
+</html>

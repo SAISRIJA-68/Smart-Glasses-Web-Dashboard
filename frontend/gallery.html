@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery — Smart Glasses Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+<div id="sidebar-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99"></div>
+
+<div class="app-shell">
+  <aside class="sidebar" id="main-sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🕶️</div>
+      <div class="logo-text"><span>SMART GLASSES</span>DASHBOARD</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Capture</div>
+      <a href="/" class="nav-link"><span class="nav-icon">📷</span> Camera</a>
+      <div class="nav-section-label">Library</div>
+      <a href="/gallery.html" class="nav-link active"><span class="nav-icon">🗂️</span> Gallery</a>
+      <a href="/timeline.html" class="nav-link"><span class="nav-icon">📅</span> Timeline</a>
+      <div class="nav-section-label">Insights</div>
+      <a href="/dashboard.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section-label">Settings</div>
+      <div class="nav-link" id="dark-toggle" style="cursor:pointer">
+        <span class="nav-icon">🌙</span> Dark Mode
+        <div class="theme-toggle" style="margin-left:auto"><div class="theme-toggle-knob"></div></div>
+      </div>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar">??</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-username">Loading...</div>
+        <div class="user-role">OPERATOR</div>
+      </div>
+      <button class="btn-logout" id="btn-logout" title="Sign Out">⏻</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+      <span class="topbar-title">MEDIA GALLERY</span>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions" style="gap:0.5rem">
+        <div class="search-bar" style="width:220px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Search tags, locations...">
+        </div>
+        <select id="filter-type" style="width:110px; padding:0.4rem 0.6rem; font-size:0.8rem;">
+          <option value="">All Media</option>
+          <option value="photo">Photos Only</option>
+          <option value="video">Videos Only</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- Active filters row -->
+      <div id="active-filters" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:1rem; min-height:24px;"></div>
+
+      <!-- Stats bar -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
+        <div style="font-size:0.8rem; color:var(--text-muted); font-family:var(--font-mono);" id="gallery-count">Loading...</div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-ghost" id="btn-view-grid" title="Grid View" style="font-size:0.8rem; padding:0.4rem 0.7rem;">⊞ Grid</button>
+          <button class="btn btn-ghost" id="btn-view-list" title="List View" style="font-size:0.8rem; padding:0.4rem 0.7rem;">☰ List</button>
+        </div>
+      </div>
+
+      <!-- Media grid -->
+      <div id="media-grid" class="media-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">🗂️</div>
+          <div class="empty-state-title">LOADING GALLERY</div>
+          <div class="spinner" style="margin:1rem auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Media Viewer Modal -->
+<div class="modal-backdrop" id="modal-viewer">
+  <div class="modal modal-media" style="background:var(--bg-deep);">
+    <div class="modal-header">
+      <span class="modal-title" id="viewer-title">MEDIA VIEWER</span>
+      <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-ghost btn-icon" id="btn-viewer-share" title="Share">🔗</button>
+        <button class="btn btn-ghost btn-icon" id="btn-viewer-download" title="Download">⬇</button>
+        <button class="btn btn-ghost btn-icon" onclick="Modal.close('modal-viewer')">×</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="background:#000; border-radius:var(--radius); overflow:hidden; margin-bottom:1rem; max-height:60vh; display:flex; align-items:center; justify-content:center;">
+        <img id="viewer-img" style="max-width:100%; max-height:60vh; object-fit:contain; display:none;">
+        <video id="viewer-vid" style="max-width:100%; max-height:60vh; display:none;" controls></video>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div>
+          <div class="form-label">LOCATION</div>
+          <input type="text" id="viewer-location" placeholder="Add location...">
+        </div>
+        <div>
+          <div class="form-label">DATE</div>
+          <div style="padding:0.6rem 0.9rem; background:var(--bg-raised); border:1px solid var(--border); border-radius:var(--radius); font-size:0.8rem; color:var(--text-muted); font-family:var(--font-mono);" id="viewer-date">—</div>
+        </div>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <div class="form-label">TAGS</div>
+        <div class="tags-input-container" id="viewer-tags-container"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="btn-viewer-delete">🗑 Delete</button>
+      <button class="btn btn-ghost" onclick="Modal.close('modal-viewer')">Close</button>
+      <button class="btn btn-primary" id="btn-viewer-save">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal-backdrop" id="modal-share">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">SHARE MEDIA</span>
+      <button class="btn btn-ghost btn-icon" onclick="Modal.close('modal-share')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Generate a shareable link for this media item.</p>
+      <div class="share-url-box">
+        <input type="text" id="share-url-input" readonly placeholder="Click Generate to create link">
+        <button class="btn btn-ghost" id="btn-copy-share">Copy</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="Modal.close('modal-share')">Close</button>
+      <button class="btn btn-primary" id="btn-generate-share">🔗 Generate Link</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) window.stop();
+Sidebar.init();
+Theme.init();
+document.getElementById('dark-toggle').addEventListener('click', Theme.toggle.bind(Theme));
+
+let allMedia = [];
+let currentItem = null;
+let viewerTagsInput = null;
+let currentFilters = { search: '', type: '' };
+
+viewerTagsInput = new TagsInput(document.getElementById('viewer-tags-container'));
+
+// ─── Load media ───────────────────────────────────────────────────────────────
+async function loadMedia() {
+  try {
+    const params = {};
+    if (currentFilters.type) params.type = currentFilters.type;
+    if (currentFilters.search) params.search = currentFilters.search;
+    allMedia = await API.getMedia(params);
+    renderGallery(allMedia);
+  } catch (err) {
+    Toast.error('Failed to load gallery: ' + err.message);
+  }
+}
+
+function renderGallery(items) {
+  const grid = document.getElementById('media-grid');
+  const countEl = document.getElementById('gallery-count');
+
+  grid.innerHTML = '';
+  countEl.textContent = `${items.length} ITEM${items.length !== 1 ? 'S' : ''}`;
+
+  if (!items.length) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state-icon">🗂️</div>
+        <div class="empty-state-title">NO MEDIA FOUND</div>
+        <p>${currentFilters.search || currentFilters.type ? 'Try different filters' : 'Capture photos and videos to see them here'}</p>
+        <a href="/" class="btn btn-primary" style="margin-top:1rem; display:inline-flex">📷 Go to Camera</a>
+      </div>`;
+    return;
+  }
+
+  items.forEach((item, i) => {
+    const card = renderMediaCard(item,
+      (item) => openViewer(item),
+      (item) => deleteMedia(item),
+      (item) => openShare(item)
+    );
+    card.style.animationDelay = `${i * 0.03}s`;
+    card.style.opacity = '0';
+    grid.appendChild(card);
+  });
+}
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+const searchInput = document.getElementById('search-input');
+searchInput.addEventListener('input', Helpers.debounce(() => {
+  currentFilters.search = searchInput.value.trim();
+  updateActiveFilters();
+  loadMedia();
+}, 300));
+
+document.getElementById('filter-type').addEventListener('change', (e) => {
+  currentFilters.type = e.target.value;
+  updateActiveFilters();
+  loadMedia();
+});
+
+function updateActiveFilters() {
+  const bar = document.getElementById('active-filters');
+  bar.innerHTML = '';
+  if (currentFilters.search) {
+    const chip = document.createElement('div');
+    chip.className = 'tag';
+    chip.style.cssText = 'cursor:pointer; padding:3px 8px; font-size:0.7rem;';
+    chip.innerHTML = `🔍 "${currentFilters.search}" <button onclick="clearFilter('search')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:0.8rem;">×</button>`;
+    bar.appendChild(chip);
+  }
+  if (currentFilters.type) {
+    const chip = document.createElement('div');
+    chip.className = 'tag';
+    chip.style.cssText = 'cursor:pointer; padding:3px 8px; font-size:0.7rem;';
+    chip.innerHTML = `📁 ${currentFilters.type} <button onclick="clearFilter('type')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:0.8rem;">×</button>`;
+    bar.appendChild(chip);
+  }
+}
+
+function clearFilter(type) {
+  if (type === 'search') { currentFilters.search = ''; searchInput.value = ''; }
+  if (type === 'type') { currentFilters.type = ''; document.getElementById('filter-type').value = ''; }
+  updateActiveFilters();
+  loadMedia();
+}
+
+// ─── Media Viewer ─────────────────────────────────────────────────────────────
+function openViewer(item) {
+  currentItem = item;
+  const img = document.getElementById('viewer-img');
+  const vid = document.getElementById('viewer-vid');
+
+  document.getElementById('viewer-title').textContent = item.type === 'video' ? 'VIDEO VIEWER' : 'PHOTO VIEWER';
+  document.getElementById('viewer-date').textContent = Helpers.formatDateTime(item.createdAt);
+  document.getElementById('viewer-location').value = item.location || '';
+  viewerTagsInput.setTags(item.tags || []);
+
+  if (item.type === 'photo') {
+    img.src = item.url; img.style.display = 'block';
+    vid.style.display = 'none'; vid.src = '';
+  } else {
+    vid.src = item.url; vid.style.display = 'block';
+    img.style.display = 'none';
+  }
+
+  // Download button
+  document.getElementById('btn-viewer-download').onclick = () => {
+    const a = document.createElement('a');
+    a.href = item.url;
+    a.download = item.filename || 'media';
+    a.click();
+  };
+
+  Modal.open('modal-viewer');
+}
+
+document.getElementById('btn-viewer-save').addEventListener('click', async () => {
+  if (!currentItem) return;
+  try {
+    const updated = await API.updateMedia(currentItem.id, {
+      tags: viewerTagsInput.getTags(),
+      location: document.getElementById('viewer-location').value.trim()
+    });
+    // Update in allMedia
+    const idx = allMedia.findIndex(m => m.id === currentItem.id);
+    if (idx !== -1) allMedia[idx] = updated;
+    currentItem = updated;
+    Toast.success('Changes saved');
+    loadMedia();
+    Modal.close('modal-viewer');
+  } catch (err) {
+    Toast.error('Save failed: ' + err.message);
+  }
+});
+
+document.getElementById('btn-viewer-delete').addEventListener('click', () => {
+  if (currentItem) { deleteMedia(currentItem); Modal.close('modal-viewer'); }
+});
+
+document.getElementById('btn-viewer-share').addEventListener('click', () => {
+  if (currentItem) { Modal.close('modal-viewer'); openShare(currentItem); }
+});
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+async function deleteMedia(item) {
+  if (!confirm('Delete this media item? This cannot be undone.')) return;
+  try {
+    await API.deleteMedia(item.id);
+    allMedia = allMedia.filter(m => m.id !== item.id);
+    renderGallery(allMedia);
+    Toast.success('Media deleted');
+  } catch (err) {
+    Toast.error('Delete failed: ' + err.message);
+  }
+}
+
+// ─── Share ────────────────────────────────────────────────────────────────────
+let shareItemId = null;
+function openShare(item) {
+  shareItemId = item.id;
+  document.getElementById('share-url-input').value = '';
+  Modal.open('modal-share');
+}
+
+document.getElementById('btn-generate-share').addEventListener('click', async () => {
+  try {
+    const { shareUrl } = await API.shareMedia(shareItemId);
+    const fullUrl = window.location.origin + shareUrl;
+    document.getElementById('share-url-input').value = fullUrl;
+    Toast.success('Share link generated!');
+  } catch (err) {
+    Toast.error('Failed to generate link');
+  }
+});
+
+document.getElementById('btn-copy-share').addEventListener('click', () => {
+  const url = document.getElementById('share-url-input').value;
+  if (url) Helpers.copyToClipboard(url);
+  else Toast.error('Generate a link first');
+});
+
+// View toggle
+document.getElementById('btn-view-grid').addEventListener('click', () => {
+  document.getElementById('media-grid').style.gridTemplateColumns = '';
+  document.getElementById('media-grid').className = 'media-grid';
+});
+document.getElementById('btn-view-list').addEventListener('click', () => {
+  document.getElementById('media-grid').style.gridTemplateColumns = '1fr';
+  document.getElementById('media-grid').classList.remove('media-grid');
+  document.getElementById('media-grid').style.display = 'flex';
+  document.getElementById('media-grid').style.flexDirection = 'column';
+  document.getElementById('media-grid').style.gap = '0.5rem';
+});
+
+loadMedia();
+</script>
+</body>
+</html>

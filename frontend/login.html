@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Smart Glasses Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-grid { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    .auth-visual {
+      background: var(--bg-deep);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 3rem;
+      position: relative; overflow: hidden;
+    }
+    .auth-visual::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,212,255,0.06), transparent 70%);
+    }
+    .glasses-visual {
+      font-size: 6rem;
+      filter: drop-shadow(0 0 40px rgba(0,212,255,0.5));
+      margin-bottom: 2rem;
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    .visual-tagline {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      color: var(--text-secondary);
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .visual-tagline span { color: var(--cyan); display: block; font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .visual-features { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .visual-feature {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .visual-feature span:first-child { color: var(--cyan); font-size: 1rem; }
+    @media (max-width: 768px) {
+      .auth-grid { grid-template-columns: 1fr; }
+      .auth-visual { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+
+<div class="auth-grid">
+  <!-- Visual Panel -->
+  <div class="auth-visual">
+    <div class="glasses-visual">🕶️</div>
+    <div class="visual-tagline">
+      <span>Smart Glasses</span>
+      Web Dashboard
+    </div>
+    <div class="visual-features">
+      <div class="visual-feature"><span>📷</span> Live camera with HUD overlay</div>
+      <div class="visual-feature"><span>🎬</span> Photo & video capture</div>
+      <div class="visual-feature"><span>🗂️</span> Organized media gallery</div>
+      <div class="visual-feature"><span>📊</span> Activity dashboard</div>
+      <div class="visual-feature"><span>🔗</span> Share media instantly</div>
+    </div>
+  </div>
+
+  <!-- Login Panel -->
+  <div class="auth-page">
+    <div class="auth-card fade-in">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">🕶️</div>
+        <div class="auth-logo-text"><span>SMART GLASSES</span>DASHBOARD v2.0</div>
+      </div>
+
+      <h2 class="auth-title">SIGN IN</h2>
+      <p class="auth-subtitle">Access your personal glasses feed</p>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="email" placeholder="user@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div id="login-error" style="display:none; color:var(--red); font-size:0.8rem; margin-bottom:0.75rem; background:var(--red-glow); padding:0.5rem 0.75rem; border-radius:var(--radius); border-left:3px solid var(--red);"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center" id="btn-login">
+          <span>SIGN IN</span>
+        </button>
+      </form>
+
+      <div class="divider"><span>OR</span></div>
+
+      <!-- Demo login -->
+      <button class="btn btn-ghost" id="btn-demo" style="width:100%; justify-content:center; margin-bottom:1rem;">
+        🎮 Try Demo Account
+      </button>
+
+      <p style="text-align:center; font-size:0.8rem; color:var(--text-muted);">
+        No account? <a href="/signup.html">Create one →</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+  // Redirect if already logged in
+  if (Auth.isLoggedIn()) window.location.href = '/';
+
+  Theme.init();
+
+  // Login form
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-login');
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div>';
+
+    try {
+      const data = await API.login({
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value
+      });
+      Auth.setAuth(data.token, data.user);
+      Toast.success('Welcome back, ' + data.user.username + '!');
+      setTimeout(() => window.location.href = '/', 500);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<span>SIGN IN</span>';
+    }
+  });
+
+  // Demo account
+  document.getElementById('btn-demo').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-demo');
+    btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+    try {
+      // Create or login demo account
+      try {
+        await API.signup({ username: 'Demo User', email: 'demo@smartglass.es', password: 'demo123456' });
+      } catch {}
+      const data = await API.login({ email: 'demo@smartglass.es', password: 'demo123456' });
+      Auth.setAuth(data.token, data.user);
+      window.location.href = '/';
+    } catch (err) {
+      Toast.error('Demo failed: ' + err.message);
+      btn.disabled = false; btn.innerHTML = '🎮 Try Demo Account';
+    }
+  });
+</script>
+</body>
+</html>

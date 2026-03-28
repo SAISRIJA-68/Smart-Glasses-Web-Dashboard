@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Media — Smart Glasses</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+
+<div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; position:relative;">
+  <div style="position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,212,255,0.04), transparent 70%); pointer-events:none;"></div>
+
+  <div style="margin-bottom:1.5rem; text-align:center;">
+    <div style="font-size:2rem; margin-bottom:0.5rem;">🕶️</div>
+    <div style="font-family:var(--font-display); font-size:0.75rem; letter-spacing:0.12em; color:var(--text-muted);">SMART GLASSES / SHARED MEDIA</div>
+  </div>
+
+  <div id="share-container" style="width:100%; max-width:700px; background:var(--bg-surface); border:1px solid var(--border-bright); border-radius:var(--radius-lg); overflow:hidden; box-shadow:0 25px 80px rgba(0,0,0,0.5);">
+    <div style="padding:2rem; text-align:center;" id="share-loading">
+      <div class="spinner" style="margin:0 auto 1rem;"></div>
+      <div style="font-size:0.8rem; color:var(--text-muted);">Loading shared media...</div>
+    </div>
+  </div>
+
+  <p style="margin-top:1rem; font-size:0.75rem; color:var(--text-dim);">
+    Powered by <a href="/" style="color:var(--cyan);">Smart Glasses Dashboard</a>
+  </p>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+Theme.init();
+
+const shareId = window.location.pathname.split('/share/')[1];
+if (!shareId) {
+  document.getElementById('share-loading').innerHTML = '<div style="color:var(--red); font-size:0.9rem;">Invalid share link.</div>';
+}
+
+async function loadShared() {
+  try {
+    const item = await API.getShared(shareId);
+    renderSharedMedia(item);
+  } catch (err) {
+    document.getElementById('share-loading').innerHTML = `<div style="color:var(--red); font-size:0.9rem;">Share link not found or expired.</div>`;
+  }
+}
+
+function renderSharedMedia(item) {
+  const container = document.getElementById('share-container');
+  const isVideo = item.type === 'video';
+
+  container.innerHTML = `
+    <div style="background:#000; max-height:70vh; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+      ${isVideo
+        ? `<video src="${item.url}" controls style="max-width:100%; max-height:70vh;"></video>`
+        : `<img src="${item.url}" style="max-width:100%; max-height:70vh; object-fit:contain;">`
+      }
+    </div>
+    <div style="padding:1.25rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+        <div>
+          <div style="font-family:var(--font-display); font-size:0.75rem; letter-spacing:0.1em; color:var(--text-primary);">
+            ${isVideo ? '🎬 VIDEO' : '📷 PHOTO'}
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono); margin-top:0.3rem;">
+            ${Helpers.formatDateTime(item.createdAt)}
+          </div>
+          ${item.location ? `<div style="font-size:0.75rem; color:var(--cyan); margin-top:0.2rem;">📍 ${item.location}</div>` : ''}
+        </div>
+        <a href="${item.url}" download class="btn btn-primary">⬇ Download</a>
+      </div>
+      ${(item.tags||[]).length ? `
+        <div style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.3rem;">
+          ${item.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>` : ''}
+    </div>
+  `;
+}
+
+if (shareId) loadShared();
+</script>
+</body>
+</html>
